@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+import argparse
 import sys
 import time
 import os
-from datetime import datetime, timezone
+from datetime import datetime
+from dateutil import tz
 from dateutil.parser import parse
 
 resolutions = {
@@ -11,21 +13,19 @@ resolutions = {
     'millis': int(1e11),
     'seconds': 0
 }
+default_ozones = os.getenv('DEFAULT_OZONES', 'UTC,Local').split(',')
 
-tzs = [
-    'UTC', # first zone is working zone
-    'US/Eastern'
-]
+parser = argparse.ArgumentParser(description='Convert time(s) to UTC')
+parser.add_argument('-i', '--izone', help='parse input as this IANA timezone', default="UTC")
+parser.add_argument('-f', '--format', help='output format', default="%Y-%m-%d %H:%M:%S.%f")
+parser.add_argument('-l', '--local', action='store_true', help='parse input using local timezone. overrides -i')
+parser.add_argument('-o', '--ozones', nargs='*', help='convert to these IANA timezones', default=[])
+parser.add_argument('-d', '--default-ozones', nargs='*', help='default ozones', default=default_ozones)
+parser.add_argument('time', nargs='*', default=[time.time_ns()])
 
-if __name__ == "__main__":
-    os.environ['TZ'] = tzs[0]
-    time.tzset()
-
-    if len(sys.argv) == 1:
-        sys.argv.append(time.time_ns())
-    
+def print_time(t, izone, ozones, format):
     try:
-        num = int(sys.argv[1])
+        num = int(t)
         ty = 'seconds'
         for i, (k, v) in enumerate(resolutions.items()):
             if num >= v:
@@ -45,11 +45,12 @@ if __name__ == "__main__":
             ty = 'seconds'
             nanos = num * int(1e9)
 
-
     except ValueError:
         ty = 'datestring'
-        date = parse(sys.argv[1])
-        nanos = int(date.strftime('%s')) * int(1e9)
+        date = parse(t)
+        if date.tzinfo is None:
+            date = datetime.fromtimestamp(date.timestamp(), tz=izone)
+        nanos = int(date.timestamp() * 1e9)
 
     for i, k in enumerate(resolutions.keys()):
         if k == ty:
@@ -62,9 +63,34 @@ if __name__ == "__main__":
     seconds = nanos // int(1e9)
     nanopart = nanos % int(1e9)
 
-    for tz in tzs:
-        os.environ['TZ'] = tz
-        time.tzset()
-        date = datetime.fromtimestamp(seconds)
-        print(f"{tz}: {date}.{nanopart}")
+    maxtznames = max([len(tz._filename) for tz in ozones]) + 2
+    for tz in ozones:
+        date = datetime.fromtimestamp(seconds, tz=tz)
+        format = format.replace('%f', str(nanopart))
+        formatted = date.strftime(format)
+        if tz == izone:
+            pretty = f"[{tz._filename}]"
+        else:
+            pretty = f"{tz._filename}"
+        print(f"{pretty:{maxtznames}}: {formatted}")
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+
+    izone = tz.gettz() if args.local else tz.gettz(args.izone)
+    if izone is None:
+        print('invalid izone', izone)
+        exit(1)
+
+    ozones = []
+    for oz in args.ozones + args.default_ozones:
+        if oz == 'Local':
+            oz = None
+        ozone = tz.gettz(oz)
+        if ozone is None:
+            print('invalid ozone', oz)
+        ozones.append(ozone)
+    
+    for t in args.time:
+        print_time(t, izone, ozones, args.format)
 
