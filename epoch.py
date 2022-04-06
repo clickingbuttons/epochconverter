@@ -21,9 +21,22 @@ parser.add_argument('-f', '--format', help='output format', default="%Y-%m-%d %H
 parser.add_argument('-l', '--local', action='store_true', help='parse input using local timezone. overrides -i')
 parser.add_argument('-o', '--ozones', nargs='*', help='convert to these IANA timezones', default=[])
 parser.add_argument('-d', '--default-ozones', nargs='*', help='default ozones', default=default_ozones)
+parser.add_argument('-v', '--tzformat', help='format for timezones', choices=['file', 'short'], default='short')
 parser.add_argument('time', nargs='*', default=[time.time_ns()])
 
-def print_time(t, izone, ozones, format):
+def format_tz(tz, dt, tzformat, izone):
+    res = ''
+    if tzformat == 'file':
+        res = tz._filename
+    else:
+        res = tz.tzname(dt)
+
+    if tz == izone:
+        return f"[{res}]"
+
+    return res
+
+def print_time(t, izone, ozones, format, tzformat):
     try:
         num = int(t)
         ty = 'seconds'
@@ -63,16 +76,17 @@ def print_time(t, izone, ozones, format):
     seconds = nanos // int(1e9)
     nanopart = nanos % int(1e9)
 
-    maxtznames = max([len(tz._filename) for tz in ozones]) + 2
+    out = [] # for column formatting
     for tz in ozones:
         date = datetime.fromtimestamp(seconds, tz=tz)
         format = format.replace('%f', str(nanopart))
         formatted = date.strftime(format)
-        if tz == izone:
-            pretty = f"[{tz._filename}]"
-        else:
-            pretty = f"{tz._filename}"
-        print(f"{pretty:{maxtznames}}: {formatted}")
+        formattedtz = format_tz(tz, date, tzformat, izone)
+        out.append((formattedtz, formatted))
+
+    maxtzname = max([len(tz) for (tz, _) in out]) 
+    for (tz, d) in out:
+        print(f"{tz:{maxtzname}}: {d}")
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -92,5 +106,5 @@ if __name__ == "__main__":
         ozones.append(ozone)
     
     for t in args.time:
-        print_time(t, izone, ozones, args.format)
+        print_time(t, izone, ozones, args.format, args.tzformat)
 
