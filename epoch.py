@@ -62,7 +62,7 @@ def print_time(t, izone, ozones, format, tzformat):
         ty = 'datestring'
         date = parse(t)
         if date.tzinfo is None:
-            date = datetime.fromtimestamp(date.timestamp(), tz=izone)
+            date = date.replace(tzinfo=izone)
         nanos = int(date.timestamp() * 1e9)
 
     for i, k in enumerate(resolutions.keys()):
