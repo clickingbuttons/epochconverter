@@ -17,7 +17,7 @@ default_ozones = os.getenv('DEFAULT_OZONES', 'UTC,Local').split(',')
 
 parser = argparse.ArgumentParser(description='Convert time(s) to UTC')
 parser.add_argument('-i', '--izone', help='parse input as this IANA timezone', default="UTC")
-parser.add_argument('-f', '--format', help='output format', default="%Y-%m-%d %H:%M:%S.%f")
+parser.add_argument('-f', '--format', help='output format', default="%a %Y-%m-%d %H:%M:%S.%f")
 parser.add_argument('-l', '--local', action='store_true', help='parse input using local timezone. overrides -i')
 parser.add_argument('-o', '--ozones', nargs='*', help='convert to these IANA timezones', default=[])
 parser.add_argument('-d', '--default-ozones', nargs='*', help='default ozones', default=default_ozones)
